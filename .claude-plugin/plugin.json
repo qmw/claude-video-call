@@ -1,0 +1,10 @@
+{
+  "name": "video-call",
+  "version": "0.1.0",
+  "description": "Claude joins your Google Meet: talks by voice, shares a browser tab it drives, takes notes and screenshots of what you share, and records the call as a video.",
+  "author": { "name": "Piotr Sobolewski" },
+  "homepage": "https://github.com/qmw/claude-video-call",
+  "repository": "https://github.com/qmw/claude-video-call",
+  "license": "MIT",
+  "keywords": ["google-meet", "voice", "screenshare", "meeting", "recording"]
+}

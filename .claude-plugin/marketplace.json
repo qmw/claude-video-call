@@ -1,0 +1,11 @@
+{
+  "name": "claude-video-call",
+  "owner": { "name": "Piotr Sobolewski" },
+  "plugins": [
+    {
+      "name": "video-call",
+      "source": "./",
+      "description": "Claude joins your Google Meet: talks by voice, shares a browser tab it drives, takes notes and screenshots of what you share, and records the call as a video."
+    }
+  ]
+}
