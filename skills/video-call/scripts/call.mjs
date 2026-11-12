@@ -172,6 +172,7 @@ function parseFlags(args) {
     else if (args[i] === '--title') out.title = args[++i];
     else if (args[i] === '--realtime') out.realtime = true;
     else if (args[i] === '--name-only') out.nameOnly = true;
+    else if (args[i] === '--wait') out.wait = true;
     else if (args[i] === '--context') out.context = args[++i];
     else out._.push(args[i]);
   }
@@ -181,7 +182,7 @@ function parseFlags(args) {
 async function start(args) {
   const opts = parseFlags(args);
   const url = opts._[0];
-  if (!url) die('Usage: start <meeting-url> [--name Claude] [--title "topic"] [--realtime [--name-only] [--context "..."]] [--no-record] [--out DIR]');
+  if (!url) die('Usage: start <meeting-url> [--name Claude] [--title "topic"] [--wait] [--realtime [--name-only] [--context "..."]] [--no-record] [--out DIR]');
   requireSetup();
   if (existsSync(f('bridge.pid'))) die('A call is already running. Run stop first.');
   const name = opts.name || 'Claude';
@@ -221,7 +222,26 @@ async function start(args) {
   writeFileSync(f('bridge.sh'), shell);
   writeFileSync(f('alerts.jsonl'), '');
   detached('bridge', 'sh', ['-c', shell]);
+  if (opts.wait) await waitAtDoor();
   console.log(`Bot joining ${url}\nVoice: ${realtime ? 'realtime' : 'Claude speaks every line'}\nRecording: ${record ? 'on' : 'off'}\nSession folder: ${dir}\nEvents: ${f('events.jsonl')}`);
+}
+
+// Blocks until the bot is waiting to be admitted or is in, so the user can be given the link then.
+// The session server's watchdog sends a new bot meanwhile if one gets stuck.
+async function waitAtDoor(maxMs = 8 * 60 * 1000) {
+  const until = Date.now() + maxMs;
+  let reported = 0;
+  while (Date.now() < until) {
+    const kinds = jsonl(f('events.jsonl')).map((e) => e.event);
+    if (kinds.includes('call.bot_waiting_room')) return console.log('The bot is waiting to be admitted.');
+    if (kinds.includes('call.bot_ready')) return console.log('The bot is in the meeting.');
+    const alerts = jsonl(f('alerts.jsonl'));
+    for (const a of alerts.slice(reported)) console.log(a.message);
+    reported = alerts.length;
+    if (alerts.some((a) => a.event === 'video_call.join_stuck')) die('The bot could not get in.');
+    await sleep(1000);
+  }
+  die('The bot did not reach the meeting in time. Run status or shot.');
 }
 
 const send = (obj) => appendFileSync(f('commands.jsonl'), `${JSON.stringify(obj)}\n`);

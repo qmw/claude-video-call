@@ -160,7 +160,8 @@ saveSession();
 
 function onEvent(e) {
   const kind = e.event || e.type;
-  if (kind === 'call.created' && e.call_id) { session.call_id = e.call_id; session.bot_ready = null; seenInMeeting = false; saveSession(); }
+  if (kind === 'call.created' && e.call_id) { session.call_id = e.call_id; session.bot_ready = null; seenInMeeting = false; createdAt = now(); reachedDoor = false; saveSession(); }
+  if (kind === 'call.bot_waiting_room' || kind === 'call.bot_ready') reachedDoor = true;
   if (kind === 'call.bot_ready') { session.bot_ready = now(); saveSession(); }
   if (kind === 'participant.joined') seenInMeeting = true;
   if (kind === 'user.message') {
@@ -202,18 +203,23 @@ pump();
 // itself), so if none show up, take it out and join again.
 const STUCK_MS = Number(env.VIDEO_CALL_STUCK_SECONDS || 30) * 1000;
 const MAX_REJOINS = Number(env.VIDEO_CALL_MAX_REJOINS || 2);
-let seenInMeeting = false, rejoins = 0, gaveUp = false, rejoining = false;
+// The same goes for a bot that never gets as far as the waiting room.
+const JOIN_MS = Number(env.VIDEO_CALL_JOIN_SECONDS || 150) * 1000;
+let seenInMeeting = false, rejoins = 0, gaveUp = false, rejoining = false, createdAt = 0, reachedDoor = false;
 setInterval(() => {
-  if (!session.bot_ready || seenInMeeting || rejoining || gaveUp) return;
-  if (now() - session.bot_ready < STUCK_MS) return;
+  if (rejoining || gaveUp) return;
+  const neverArrived = createdAt && !reachedDoor && now() - createdAt > JOIN_MS;
+  const neverEntered = session.bot_ready && !seenInMeeting && now() - session.bot_ready > STUCK_MS;
+  if (!neverArrived && !neverEntered) return;
   if (rejoins >= MAX_REJOINS) {
     gaveUp = true;
-    alert({ event: 'video_call.join_stuck', message: 'The bot says it is ready but never appeared in the meeting. Run shot to see where it is stuck.' });
+    alert({ event: 'video_call.join_stuck', message: 'The bot still has not got into the meeting after rejoining. Run shot to see where it is stuck.' });
     return;
   }
   rejoins++;
   rejoining = true;
-  alert({ event: 'video_call.rejoining', attempt: rejoins, message: 'The bot never appeared in the meeting, so it is rejoining. The host must admit it again; run share again after bot_ready.' });
+  createdAt = 0;
+  alert({ event: 'video_call.rejoining', attempt: rejoins, message: `${neverArrived ? 'The bot never reached the meeting' : 'The bot never appeared in the meeting'}, so it is rejoining. The host must admit it again; run share again after bot_ready.` });
   const child = spawn(process.execPath, [join(HERE, 'call.mjs'), 'rejoin'], { detached: true, stdio: 'ignore', env });
   child.unref();
   setTimeout(() => { rejoining = false; }, 15000);

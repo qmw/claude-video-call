@@ -24,6 +24,8 @@ Each person uses their own connectors and their own AgentCall key. Check what th
 
 The owner of the meeting may have to admit the bot, so the user should join from that account.
 
+**When you organize, get the bot there first.** Joining takes AgentCall one to three minutes, and people shouldn't sit in an empty meeting waiting for it. Create the event, run `C start "<url>" --wait ...`, and give the user the link only once it prints that the bot is waiting to be admitted (or is in). Then they can join and admit it straight away. When you join someone else's meeting, start without `--wait` and tell them the bot is on its way.
+
 ## Running the call
 
 1. `C start "<meet-url>" --title "<short topic>"` starts the shared Chrome, the recorder and the bot, and prints the session folder. Costs start when the bot joins. Add `--realtime` for the faster voice described below, and `--no-record` if the user doesn't want a recording.
@@ -32,7 +34,7 @@ The owner of the meeting may have to admit the bot, so the user should join from
    tail -n0 -F ~/.video-call/events.jsonl ~/.video-call/alerts.jsonl | grep --line-buffered -E '"event":"(user.message|voice.text|video_call\.[a-z_]+|call.ended|call.degraded|call.recovered|error|command.error|participant.joined|participant.left|call.bot_ready|call.bot_waiting_room|call.max_duration_warning)"'
    ```
    Re-arm it at once if it expires during a call, then check `events.jsonl` for anything you missed.
-3. **Make sure the bot really got in.** AgentCall sometimes reports `call.bot_ready` while the bot is still stuck on Meet's "Enter your name to join" page. A watchdog catches this: if no `participant.joined` follows within 30 seconds, it takes the bot out and sends a new one, up to twice, and reports `video_call.rejoining` (tell the host to admit the bot again, and run `C share` again after the next `call.bot_ready`) or `video_call.join_stuck` (run `C shot` to see what's wrong). You can also run `C rejoin` yourself whenever the bot is stuck or silent; the browser, recording and session folder carry on.
+3. **Make sure the bot really got in.** AgentCall sometimes leaves a bot stuck: still "joining" after minutes, or reporting `call.bot_ready` while it sits on Meet's "Enter your name to join" page. A watchdog catches both. If the bot hasn't reached the waiting room within 150 seconds, or no `participant.joined` follows within 30 seconds of `call.bot_ready`, it takes the bot out and sends a new one, up to twice, and reports `video_call.rejoining` (tell the host to admit the bot again, and run `C share` again after the next `call.bot_ready`) or `video_call.join_stuck` (run `C shot` to see what's wrong). You can also run `C rejoin` yourself whenever the bot is stuck or silent; the browser, recording and session folder carry on.
 4. When the first person joins, greet them with `C say "..."`. If recording, say so in the greeting, for example "Hi, I'm recording this call to a video on your computer so we can refer back to it." People have a right to know, and in many places it's a legal requirement. If anyone objects, stop recording: run `C stop --no-video`, then `C start` again with `--no-record`.
 5. After about 20 seconds, run `C status`. `audio_chunks` should be growing and `audio_error` should be empty. If the recorder reports an error, tell the user the video will have captions but no sound.
 
