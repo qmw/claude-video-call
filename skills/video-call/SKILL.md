@@ -26,14 +26,31 @@ The owner of the meeting may have to admit the bot, so the user should join from
 
 ## Running the call
 
-1. `C start "<meet-url>" --title "<short topic>"` starts the shared Chrome, the recorder and the bot, and prints the session folder. Costs start when the bot joins. Add `--no-record` if the user doesn't want a recording.
+1. `C start "<meet-url>" --title "<short topic>"` starts the shared Chrome, the recorder and the bot, and prints the session folder. Costs start when the bot joins. Add `--realtime` for the faster voice described below, and `--no-record` if the user doesn't want a recording.
 2. At once, start a Monitor, because this is how speech reaches you. Keep the filter line-buffered: adding `cut`, `head` or any other buffering stage silently holds speech back, and the user experiences that as you ignoring them.
    ```bash
-   tail -n0 -F ~/.video-call/events.jsonl | grep --line-buffered -E '"event":"(user.message|call.ended|call.degraded|error|command.error|participant.joined|participant.left|call.bot_ready|call.bot_waiting_room|call.max_duration_warning)"'
+   tail -n0 -F ~/.video-call/events.jsonl ~/.video-call/alerts.jsonl | grep --line-buffered -E '"event":"(user.message|voice.text|video_call\.[a-z_]+|call.ended|call.degraded|call.recovered|error|command.error|participant.joined|participant.left|call.bot_ready|call.bot_waiting_room|call.max_duration_warning)"'
    ```
-   Re-arm it if it expires during a call.
-3. When the first person joins, greet them with `C say "..."`. If recording, say so in the greeting, for example "Hi, I'm recording this call to a video on your computer so we can refer back to it." People have a right to know, and in many places it's a legal requirement. If anyone objects, stop recording: run `C stop --no-video`, then `C start` again with `--no-record`.
-4. After about 20 seconds, run `C status`. `audio_chunks` should be growing and `audio_error` should be empty. If the audio recorder reports an error, tell the user the video will have captions but no sound.
+   Re-arm it at once if it expires during a call, then check `events.jsonl` for anything you missed.
+3. **Make sure the bot really got in.** AgentCall sometimes reports `call.bot_ready` while the bot is still stuck on Meet's "Enter your name to join" page. A watchdog catches this: if no `participant.joined` follows within 30 seconds, it takes the bot out and sends a new one, up to twice, and reports `video_call.rejoining` (tell the host to admit the bot again, and run `C share` again after the next `call.bot_ready`) or `video_call.join_stuck` (run `C shot` to see what's wrong). You can also run `C rejoin` yourself whenever the bot is stuck or silent; the browser, recording and session folder carry on.
+4. When the first person joins, greet them with `C say "..."`. If recording, say so in the greeting, for example "Hi, I'm recording this call to a video on your computer so we can refer back to it." People have a right to know, and in many places it's a legal requirement. If anyone objects, stop recording: run `C stop --no-video`, then `C start` again with `--no-record`.
+5. After about 20 seconds, run `C status`. `audio_chunks` should be growing and `audio_error` should be empty. If the recorder reports an error, tell the user the video will have captions but no sound.
+
+## Realtime voice (optional)
+
+By default you speak every line yourself, so each answer waits for you to think. With `C start ... --realtime`, AgentCall's voice intelligence answers by itself within a second or two, and it answers practically everything said. That suits a call with one person. In a group, add `--name-only`, so it answers only when someone says your name, then stays engaged for 20 seconds. It costs about $1 an hour more. Offer it when the user wants a snappier conversation.
+
+The voice can't see. Tell it what's on screen with `C context` as soon as you know, because people will ask it.
+
+You are still in charge, and you still get every `user.message`:
+
+- The voice knows only what the meeting said and what you give it. After you learn or do something, run `C context "<facts, current page, results>"` (up to 4000 characters; it replaces the previous context).
+- When someone asks for an action, the voice says it's on it. You do the work, update the context, then either `C say "<exact words>"` to report the result, or `C answer "<the question>"` to make the voice answer it from the new context.
+- `C say` speaks your exact words and is retried if someone talks over it, so keep it to one or two sentences.
+- `voice.text` events show what the voice actually said. Correct it with `C say` if it got something wrong.
+- If people say they can't hear the bot although `voice.text` events keep arriving, run `C rejoin`.
+- Pass a short brief at start with `--context "..."`: who the user is and what the call is about.
+- If you get `call.degraded`, the voice is down. Tell people in the chat with `C chat`, and wait for `call.recovered`.
 
 ## When to share your screen
 
@@ -96,7 +113,7 @@ Then finish the session folder so a later session can pick the work up:
 
 1. Read `notes.md` and `transcript.md`, and look again at the screenshots that matter.
 2. Write `summary.md` in the session folder: what the call was about, decisions, requirements and changes to make (each linked to its screenshot where there is one), open questions, and next steps.
-3. Tell the user where the folder is and what's in it. Point to `recording.mp4`, which has the meeting view, sound, and captions you can switch on. A `recording.srt` file with the same captions sits next to it.
+3. Tell the user where the folder is and what's in it. Point to `recording.mp4`, which has the meeting view, your voice, and captions of everyone, which can be switched on. Other people's voices aren't in the sound track, because AgentCall doesn't pass meeting audio to the bot in screen-sharing calls; their words are in the captions. A `recording.srt` file with the same captions sits next to it.
 
 Session folders live in `~/video-calls/` unless `--out` was given. They can hold private things people showed, so don't commit them to a repository unless the user asks.
 
@@ -107,7 +124,7 @@ Session folders live in `~/video-calls/` unless `--out` was given. They can hold
 | `notes.md` | Your notes and labelled screenshots, in time order |
 | `screenshots/` | Screenshots you chose to keep |
 | `transcript.md` | Who said what, from speech recognition |
-| `recording.mp4`, `recording.srt` | Video of the meeting view (a still every 2 seconds), with audio and captions |
+| `recording.mp4`, `recording.srt` | Video of the meeting view (a still every 2 seconds), with your voice and captions of everyone |
 | `summary.md` | Your write-up at the end |
 | `frames/`, `audio.webm`, `*.json*` | Raw material for the video. `C video <folder>` rebuilds it |
 

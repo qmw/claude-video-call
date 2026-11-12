@@ -2,10 +2,10 @@
 
 A Claude Code plugin that puts Claude on your Google Meet call.
 
-- **It talks.** You speak, Claude hears it as text and answers out loud.
+- **It talks.** You speak, Claude hears it as text and answers out loud. With `--realtime`, a real-time voice answers within a second or two while Claude steers it and does the work.
 - **It shares its screen.** Claude shares a real Chrome tab that it clicks, scrolls and types in while you watch. It shares by itself when it organized the meeting, and otherwise when you ask.
 - **It watches your screen.** Share your screen and Claude takes labelled screenshots and writes notes, so a later session can implement what you showed.
-- **It records.** The whole call is saved as `recording.mp4`: the meeting view, the sound, and captions of who said what.
+- **It records.** The whole call is saved as `recording.mp4`: the meeting view, Claude's voice, and captions of who said what.
 
 At the end, Claude writes a summary next to the notes, screenshots, transcript and video, in `~/video-calls/<date>_<topic>/`.
 
@@ -39,7 +39,9 @@ Then start a new session and say, for example, "create a Meet and share your scr
 - AgentCall is a paid third-party service. Meeting audio, video and the shared tab pass through it. Check its [pricing](https://agentcall.dev/pricing) and [privacy policy](https://agentcall.dev/privacy).
 - Claude announces the recording when it greets people. Recording a call can need everyone's consent where you live. Say "don't record" to turn it off.
 - The video is the meeting as the bot sees it, at one still every 2 seconds. That works for screens and slides, not for smooth motion.
-- The audio is recorded by the bot's camera page, which receives the meeting audio as its microphone. If that ever fails, the video still has captions.
+- The sound track has Claude's voice only. AgentCall doesn't give the bot the meeting audio in screen-sharing calls, so everyone else is in the captions. `VIDEO_CALL_RECORD_MIC=1` tries the bot page's microphone anyway, which came through silent in our tests.
+- With `--realtime`, AgentCall's voice model answers straight away and Claude steers it. It answers almost everything said, which suits one-to-one calls; `--name-only` makes it wait for its name in groups.
+- If AgentCall reports the bot ready while it's actually stuck outside the meeting, a watchdog sends a new bot, up to twice.
 - English only.
 - The shared Chrome is a separate, empty profile, so it isn't signed in to your accounts. Google and some other sites may show it a robot check.
 - Session folders can contain whatever people showed on the call. They stay on your computer.
